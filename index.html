@@ -15,14 +15,59 @@
     --bg: #f7f5f2; --surface: #ffffff; --surface2: #f0ece7; --text: #1f1d1b; --muted: #77716a;
     --line: #e4ded6; --accent: #e8505b; --accent-soft: #fde7e8; --good: #2e9e6a; --good-soft: #e1f4ea;
     --bad: #d9534f; --bad-soft: #fbe5e4; --shadow: 0 2px 10px rgba(40,30,20,.06);
+    --warn: #d9952b; --blue: #2f6fd6; --blue-soft: #e3edfc;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #161514; --surface: #211f1d; --surface2: #2b2926; --text: #f2eee9; --muted: #a29b93;
       --line: #36322e; --accent: #ff6b74; --accent-soft: #3a2224; --good: #4cc48b; --good-soft: #1d3329;
       --bad: #ff7a74; --bad-soft: #3a2220; --shadow: none;
+      --warn: #e8a840; --blue: #7aa7f0; --blue-soft: #1e2a3d;
     }
   }
+  /* ---- 학습 기능 확장 ---- */
+  .hero.col { flex-direction: column; align-items: stretch; gap: 10px; }
+  .hero-top { display: flex; justify-content: space-between; align-items: flex-end; }
+  .hero .big small { font-size: 16px; color: var(--muted); font-weight: 600; }
+  .streak { text-align: right; font-weight: 800; font-size: 17px; }
+  .big-btn { width: 100%; padding: 16px; font-size: 17px; margin-bottom: 10px; }
+  .quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .quick button { background: var(--surface); border-radius: 16px; padding: 12px 4px; display: flex; flex-direction: column;
+                  align-items: center; gap: 1px; box-shadow: var(--shadow); }
+  .quick button:active { transform: scale(.97); }
+  .quick span { font-size: 24px; }
+  .quick b { font-size: 14px; }
+  .quick small { color: var(--muted); font-size: 11px; }
+  .setup-btn { width: 100%; display: flex; justify-content: space-between; background: var(--surface); border-radius: 14px;
+               padding: 14px 16px; font-weight: 600; box-shadow: var(--shadow); }
+  .due-txt { color: var(--bad); }
+  .chips.wrap { flex-wrap: wrap; overflow: visible; }
+  .hint { font-weight: 500; }
+  .link-row { display: flex; gap: 14px; margin: 8px 4px 0; }
+  .link-row button, .link { color: var(--accent); font-size: 14px; font-weight: 600; padding: 4px 0; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button { padding: 9px 13px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); font-size: 14px; }
+  .seg button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  .btn.full { width: 100%; margin-top: 16px; }
+  .btn.warn { background: var(--warn); }
+  .actions.three { grid-template-columns: repeat(3, 1fr); }
+  .actions .btn small { display: block; font-size: 11px; font-weight: 500; opacity: .9; }
+  .star { position: absolute; top: 14px; left: 12px; width: 44px; height: 44px; font-size: 26px; color: var(--muted); }
+  .star.on, .star-sm.on { color: #f4b400; }
+  .star-sm { font-size: 22px; color: var(--muted); padding: 4px 6px; flex: none; }
+  .lv { font-size: 11px; padding: 3px 9px; border-radius: 99px; background: var(--surface2); color: var(--muted); font-weight: 700; }
+  .lv.new { background: var(--blue-soft); color: var(--blue); }
+  .lv.due { background: var(--bad-soft); color: var(--bad); }
+  .steps i { font-style: normal; }
+  .dot.mid { background: var(--warn); }
+  .card { transition: transform .15s ease-out; touch-action: pan-y; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 8px; }
+  .stats div { background: var(--surface); border-radius: 14px; padding: 12px; text-align: center; font-size: 13px; color: var(--muted); }
+  .stats b { display: block; font-size: 26px; }
+  .listen-btn { width: 96px; height: 96px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 40px;
+                margin: 10px auto 6px; display: grid; place-items: center; }
+  .listen-btn:active { transform: scale(.95); }
+  .q-type { grid-template-columns: repeat(3, 1fr) !important; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; height: 100%; }
   body {
@@ -158,361 +203,6 @@
 <div id="sheetRoot"></div>
 
 <script src="data.js"></script>
-<script>
-(() => {
-  // ---------- 저장소 ----------
-  const KEY = 'jp-kaiwa.v1';
-  const defaults = { progress: {}, custom: [], settings: { rate: 0.9, order: 'pron', autoplay: true, shuffle: true } };
-  let store;
-  try { store = Object.assign({}, defaults, JSON.parse(localStorage.getItem(KEY) || '{}')); }
-  catch (e) { store = JSON.parse(JSON.stringify(defaults)); }
-  store.settings = Object.assign({}, defaults.settings, store.settings);
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} };
-
-  // ---------- 데이터 ----------
-  const toItem = (a, cat) => ({ jp: a[0], kana: a[1] || a[0], ko: a[2], mean: a[3], cat,
-    kind: (a[1] || a[0]).replace(/\s/g, '').length >= 7 ? 'phrase' : 'word' });
-  function categories() {
-    const cats = JP_DATA.map(c => ({ ...c, list: c.items.map(a => toItem(a, c.id)) }));
-    cats.push({ id: 'mine', name: '내 단어', icon: '⭐', list: store.custom.map(a => toItem(a, 'mine')) });
-    return cats;
-  }
-  const allItems = () => categories().flatMap(c => c.list);
-  const prog = it => store.progress[it.jp] || { ok: 0, ng: 0, due: false };
-  const isLearned = it => { const p = prog(it); return p.ok > 0 && !p.due; };
-  function mark(it, good) {
-    const p = Object.assign({ ok: 0, ng: 0, due: false }, store.progress[it.jp]);
-    if (good) { p.ok++; p.due = false; } else { p.ng++; p.due = true; }
-    p.t = Date.now(); store.progress[it.jp] = p; save();
-  }
-
-  // ---------- 음성 (TTS) ----------
-  let jaVoice = null;
-  function pickVoice() {
-    if (!('speechSynthesis' in window)) return;
-    const vs = speechSynthesis.getVoices();
-    jaVoice = vs.find(v => /ja[-_]JP/i.test(v.lang) && /google|kyoko|o-ren|nanami/i.test(v.name)) ||
-              vs.find(v => /^ja/i.test(v.lang)) || null;
-  }
-  if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
-  function speak(text, slow) {
-    if (!('speechSynthesis' in window)) { toast('이 브라우저는 음성 재생을 지원하지 않아요'); return; }
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ja-JP'; if (jaVoice) u.voice = jaVoice;
-    u.rate = slow ? 0.55 : store.settings.rate;
-    speechSynthesis.speak(u);
-  }
-
-  // ---------- 공통 UI ----------
-  const $view = document.getElementById('view');
-  const $title = document.getElementById('title');
-  const $back = document.getElementById('backBtn');
-  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-  function toast(msg) {
-    const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
-    document.body.appendChild(t); setTimeout(() => t.remove(), 1800);
-  }
-  let backTo = null;
-  function setHeader(title, back) {
-    $title.textContent = title; backTo = back || null;
-    $back.classList.toggle('hidden', !back);
-    window.scrollTo(0, 0);
-  }
-  $back.onclick = () => { speechSynthesis && speechSynthesis.cancel(); backTo && backTo(); };
-  document.getElementById('setBtn').onclick = () => renderSettings();
-  document.getElementById('addBtn').onclick = () => renderAdd();
-
-  let kindFilter = 'all'; // all | word | phrase
-  const filterKind = list => kindFilter === 'all' ? list : list.filter(i => i.kind === kindFilter);
-  const kindLabel = { all: '전체', word: '단어', phrase: '문장' };
-
-  // ---------- 홈 ----------
-  function renderHome() {
-    setHeader('일본어 회화');
-    const cats = categories();
-    const all = cats.flatMap(c => c.list);
-    const due = all.filter(i => prog(i).due);
-    const learned = all.filter(isLearned).length;
-    $view.innerHTML = `
-      <div class="hero">
-        <div class="grow">
-          <div class="big">${learned}<span style="font-size:16px;color:var(--muted)"> / ${all.length}</span></div>
-          <div class="sub">외운 표현 · 복습할 것 ${due.length}개</div>
-        </div>
-        <button class="btn" id="dueBtn" ${due.length ? '' : 'disabled'}>복습하기</button>
-      </div>
-      <div class="chips" id="kinds">
-        ${['all', 'word', 'phrase'].map(k => `<button class="chip ${kindFilter === k ? 'on' : ''}" data-k="${k}">${kindLabel[k]}</button>`).join('')}
-      </div>
-      <div class="section-title">주제별 학습</div>
-      <div class="grid">
-        <button class="cat" data-id="__all">
-          <div class="emoji">📚</div><div class="name">전체</div>
-          <div class="meta">${filterKind(all).length}개</div>
-          <div class="bar"><i style="width:${pct(filterKind(all))}%"></i></div>
-        </button>
-        ${cats.map(c => {
-          const l = filterKind(c.list);
-          return `<button class="cat" data-id="${c.id}">
-            <div class="emoji">${c.icon}</div><div class="name">${esc(c.name)}</div>
-            <div class="meta">${l.length}개${c.id === 'mine' && !l.length ? ' · ＋로 추가' : ''}</div>
-            <div class="bar"><i style="width:${pct(l)}%"></i></div>
-          </button>`;
-        }).join('')}
-      </div>`;
-    $view.querySelector('#kinds').onclick = e => { const k = e.target.dataset.k; if (k) { kindFilter = k; renderHome(); } };
-    $view.querySelector('#dueBtn').onclick = () => openModes({ id: '__due', name: '복습', icon: '🔁', list: due });
-    $view.querySelectorAll('.cat').forEach(b => b.onclick = () => {
-      const id = b.dataset.id;
-      const c = id === '__all' ? { id, name: '전체', icon: '📚', list: all } : cats.find(x => x.id === id);
-      openModes({ ...c, list: filterKind(c.list) });
-    });
-  }
-  function pct(list) { return list.length ? Math.round(list.filter(isLearned).length / list.length * 100) : 0; }
-
-  // ---------- 모드 선택 시트 ----------
-  function openModes(cat) {
-    const root = document.getElementById('sheetRoot');
-    if (!cat.list.length) { toast(cat.id === 'mine' ? '오른쪽 위 ＋ 버튼으로 내 단어를 추가해 보세요' : '표현이 없어요'); return; }
-    root.innerHTML = `<div class="sheet-bg"><div class="sheet">
-      <h2>${cat.icon} ${esc(cat.name)}</h2><p>${cat.list.length}개 표현${kindFilter !== 'all' ? ' · ' + kindLabel[kindFilter] + '만' : ''}</p>
-      <button class="mode" data-m="study"><span class="e">🃏</span><div><b>카드 학습</b><span>발음 → 뜻을 이어서 외우기</span></div></button>
-      <button class="mode" data-m="quiz"><span class="e">✅</span><div><b>퀴즈</b><span>발음 듣고 뜻 고르기 / 뜻 보고 발음 고르기</span></div></button>
-      <button class="mode" data-m="list"><span class="e">📋</span><div><b>목록 보기</b><span>전체 표현 훑어보고 들어보기</span></div></button>
-    </div></div>`;
-    const bg = root.firstElementChild;
-    bg.onclick = e => {
-      if (e.target === bg) { root.innerHTML = ''; return; }
-      const m = e.target.closest('.mode'); if (!m) return;
-      root.innerHTML = '';
-      ({ study: renderStudy, quiz: renderQuiz, list: renderList })[m.dataset.m](cat);
-    };
-  }
-
-  // ---------- 카드 학습 ----------
-  const ORDERS = {
-    pron: { label: '발음 → 뜻 → 표기', seq: ['ko', 'mean', 'jp'] },
-    jp:   { label: '표기 → 발음 → 뜻', seq: ['jp', 'ko', 'mean'] },
-    mean: { label: '뜻 → 발음 → 표기', seq: ['mean', 'ko', 'jp'] },
-  };
-  const stepName = { ko: '발음', mean: '뜻', jp: '일본어' };
-  function slotHtml(kind, it, first) {
-    if (kind === 'ko') return `<div class="slot ${first ? 'first' : ''}"><div class="label">한글 발음</div><div class="ko-pron">${esc(it.ko)}</div></div>`;
-    if (kind === 'mean') return `<div class="slot ${first ? 'first' : ''}"><div class="label">뜻</div><div class="mean">${esc(it.mean)}</div></div>`;
-    return `<div class="slot ${first ? 'first' : ''}"><div class="label">일본어</div><div class="jp">${esc(it.jp)}</div>${it.kana !== it.jp ? `<div class="kana">${esc(it.kana)}</div>` : ''}</div>`;
-  }
-  function renderStudy(cat) {
-    const deck = store.settings.shuffle ? shuffle(cat.list) : cat.list.slice();
-    let idx = 0, step = 0, okCount = 0;
-    const seq = ORDERS[store.settings.order].seq;
-    setHeader(cat.name + ' · 카드', renderHome);
-
-    function draw() {
-      if (idx >= deck.length) return finish();
-      const it = deck[idx];
-      const shown = seq.slice(0, step + 1);
-      const done = step >= seq.length - 1;
-      $view.innerHTML = `
-        <div class="progress-line"><span>${idx + 1} / ${deck.length}</span><div class="bar"><i style="width:${idx / deck.length * 100}%"></i></div></div>
-        <div class="card" id="card">
-          <button class="speak slow" id="slow" aria-label="느리게 듣기">느리게</button>
-          <button class="speak" id="spk" aria-label="듣기">🔊</button>
-          <div class="steps">${seq.map((s, i) => `<span class="${i <= step ? 'on' : ''}">${stepName[s]}</span>`).join('<span style="background:none;padding:0">→</span>')}</div>
-          ${shown.map((k, i) => slotHtml(k, it, i === 0)).join('')}
-          <div class="tap-hint">${done ? '외웠나요?' : `탭해서 <b>${stepName[seq[step + 1]]}</b> 보기`}</div>
-        </div>
-        ${done ? `<div class="actions"><button class="btn bad" id="ng">다시 볼래요</button><button class="btn good" id="ok">외웠어요</button></div>` : ''}
-        <div class="nav-row"><button id="prev" ${idx === 0 ? 'disabled' : ''}>← 이전</button><button id="skip">건너뛰기 →</button></div>`;
-      const say = slow => speak(it.kana, slow);
-      $view.querySelector('#spk').onclick = e => { e.stopPropagation(); say(false); };
-      $view.querySelector('#slow').onclick = e => { e.stopPropagation(); say(true); };
-      $view.querySelector('#card').onclick = () => {
-        if (step < seq.length - 1) {
-          step++;
-          if (seq[step] === 'ko' && store.settings.autoplay) say(false);
-          draw();
-        }
-      };
-      if (done) {
-        $view.querySelector('#ok').onclick = () => { mark(it, true); okCount++; next(); };
-        $view.querySelector('#ng').onclick = () => { mark(it, false); deck.push(it); next(); }; // 덱 뒤에 다시 넣기
-      }
-      $view.querySelector('#prev').onclick = () => { if (idx > 0) { idx--; step = 0; draw(); } };
-      $view.querySelector('#skip').onclick = next;
-      // 발음이 첫 단계면 자동 재생
-      if (step === 0 && seq[0] === 'ko' && store.settings.autoplay) say(false);
-    }
-    function next() { idx++; step = 0; draw(); }
-    function finish() {
-      $view.innerHTML = `<div class="result"><div style="font-size:48px">🎉</div>
-        <h2>학습 완료!</h2><p class="note">이번에 외운 표현 ${okCount}개</p>
-        <div class="actions"><button class="btn ghost" id="home">홈으로</button><button class="btn" id="quiz">퀴즈로 확인</button></div></div>`;
-      $view.querySelector('#home').onclick = renderHome;
-      $view.querySelector('#quiz').onclick = () => renderQuiz(cat);
-    }
-    draw();
-  }
-
-  // ---------- 퀴즈 ----------
-  let quizType = 'p2m';
-  function renderQuiz(cat) {
-    setHeader(cat.name + ' · 퀴즈', renderHome);
-    const pool = allItems();
-    const qs = shuffle(cat.list).slice(0, Math.min(10, cat.list.length));
-    let qi = 0, score = 0; const wrong = [];
-
-    function optionsFor(it) {
-      const field = quizType === 'p2m' ? 'mean' : 'ko';
-      // 같은 종류(단어/문장)에서 오답 고르기
-      const same = pool.filter(x => x[field] !== it[field] && x.kind === it.kind);
-      const others = shuffle(same.length >= 3 ? same : pool.filter(x => x[field] !== it[field]));
-      const seen = new Set([it[field]]); const opts = [it];
-      for (const o of others) { if (opts.length >= 4) break; if (!seen.has(o[field])) { seen.add(o[field]); opts.push(o); } }
-      return shuffle(opts);
-    }
-    function draw() {
-      if (qi >= qs.length) return finish();
-      const it = qs[qi];
-      const opts = optionsFor(it);
-      const p2m = quizType === 'p2m';
-      $view.innerHTML = `
-        <div class="q-type"><button data-t="p2m" class="${p2m ? 'on' : ''}">🎧 발음 → 뜻</button><button data-t="m2p" class="${!p2m ? 'on' : ''}">💡 뜻 → 발음</button></div>
-        <div class="progress-line"><span>${qi + 1} / ${qs.length}</span><div class="bar"><i style="width:${qi / qs.length * 100}%"></i></div><span>✓ ${score}</span></div>
-        <div class="q-card">
-          ${p2m ? `<button class="speak" id="spk">🔊</button><div class="label">이 발음의 뜻은?</div><div class="ko-pron" style="font-size:32px">${esc(it.ko)}</div>`
-                : `<div class="label">이 뜻을 일본어로?</div><div class="mean" style="font-size:28px">${esc(it.mean)}</div>`}
-        </div>
-        <div class="options">${opts.map((o, i) => `<button class="opt" data-i="${i}">${esc(p2m ? o.mean : o.ko)}</button>`).join('')}</div>
-        <div id="fb"></div>`;
-      $view.querySelector('.q-type').onclick = e => { const t = e.target.dataset.t; if (t && t !== quizType) { quizType = t; draw(); } };
-      if (p2m) { $view.querySelector('#spk').onclick = () => speak(it.kana); if (store.settings.autoplay) speak(it.kana); }
-      let answered = false;
-      $view.querySelectorAll('.opt').forEach(b => b.onclick = () => {
-        if (answered) return; answered = true;
-        const pick = opts[+b.dataset.i]; const right = pick === it;
-        $view.querySelectorAll('.opt').forEach(x => { if (opts[+x.dataset.i] === it) x.classList.add('right'); });
-        if (!right) { b.classList.add('wrong'); wrong.push(it); } else score++;
-        mark(it, right);
-        speak(it.kana);
-        $view.querySelector('#fb').innerHTML = `<div class="feedback">
-          <div>${right ? '⭕ 정답!' : '❌ 아쉬워요'}</div>
-          <div class="jp" style="font-size:22px;margin-top:6px">${esc(it.jp)}</div>
-          <div><b style="color:var(--accent)">${esc(it.ko)}</b> · ${esc(it.mean)}</div>
-          <button class="btn" style="width:100%;margin-top:12px" id="nx">${qi + 1 < qs.length ? '다음 문제' : '결과 보기'}</button></div>`;
-        $view.querySelector('#nx').onclick = () => { qi++; draw(); };
-      });
-    }
-    function finish() {
-      $view.innerHTML = `<div class="result"><div class="score">${score}<span style="font-size:22px;color:var(--muted)"> / ${qs.length}</span></div>
-        <p class="note">${score === qs.length ? '완벽해요! 🎉' : '틀린 표현은 홈의 [복습하기]에 모아뒀어요'}</p></div>
-        ${wrong.map(rowHtml).join('')}
-        <div class="actions"><button class="btn ghost" id="home">홈으로</button><button class="btn" id="again">한 번 더</button></div>`;
-      bindRows(wrong);
-      $view.querySelector('#home').onclick = renderHome;
-      $view.querySelector('#again').onclick = () => renderQuiz(cat);
-    }
-    draw();
-  }
-
-  // ---------- 목록 ----------
-  function rowHtml(it, i) {
-    const p = prog(it);
-    return `<button class="row" data-i="${i}"><span class="dot ${p.due ? 'due' : isLearned(it) ? 'ok' : ''}"></span>
-      <div class="t"><div class="jp">${esc(it.jp)}${it.kana !== it.jp ? ` <span class="kana">${esc(it.kana)}</span>` : ''}</div>
-      <div class="ko-pron">${esc(it.ko)}</div><div class="mean">${esc(it.mean)}</div></div><span>🔊</span></button>`;
-  }
-  function bindRows(list) {
-    $view.querySelectorAll('.row').forEach(r => r.onclick = () => speak(list[+r.dataset.i].kana));
-  }
-  function renderList(cat) {
-    setHeader(cat.name + ' · 목록', renderHome);
-    $view.innerHTML = `<input class="search" id="q" placeholder="일본어 · 한글 발음 · 뜻으로 검색" autocomplete="off">
-      <p class="note" style="margin:0 4px 10px">🟢 외움 · 🔴 복습 필요 · 탭하면 발음을 들려줘요</p><div id="rows"></div>`;
-    const $rows = $view.querySelector('#rows');
-    const draw = q => {
-      q = (q || '').trim().toLowerCase();
-      const l = q ? cat.list.filter(i => [i.jp, i.kana, i.ko, i.mean].some(s => s.toLowerCase().includes(q))) : cat.list;
-      $rows.innerHTML = l.length ? l.map(rowHtml).join('') : '<div class="empty">검색 결과가 없어요</div>';
-      $rows.querySelectorAll('.row').forEach(r => r.onclick = () => speak(l[+r.dataset.i].kana));
-    };
-    $view.querySelector('#q').oninput = e => draw(e.target.value);
-    draw();
-  }
-
-  // ---------- 내 단어 추가 ----------
-  function renderAdd() {
-    setHeader('내 단어 추가', renderHome);
-    $view.innerHTML = `<div class="panel">
-        <div class="field"><label>일본어 *</label><input id="fJp" placeholder="예: 美味しい"></div>
-        <div class="field"><label>읽기 (히라가나, 선택 · 음성 재생에 사용)</label><input id="fKana" placeholder="예: おいしい"></div>
-        <div class="field"><label>한글 발음 *</label><input id="fKo" placeholder="예: 오이시-"></div>
-        <div class="field"><label>뜻 *</label><input id="fMean" placeholder="예: 맛있다"></div>
-        <div class="actions"><button class="btn ghost" id="test">🔊 들어보기</button><button class="btn" id="save">추가하기</button></div>
-      </div>
-      <div class="section-title">내 단어 (${store.custom.length})</div>
-      <div id="mine">${store.custom.length ? '' : '<div class="empty">아직 추가한 표현이 없어요</div>'}</div>`;
-    const v = id => $view.querySelector(id).value.trim();
-    $view.querySelector('#test').onclick = () => { const t = v('#fKana') || v('#fJp'); t ? speak(t) : toast('일본어를 입력해 주세요'); };
-    $view.querySelector('#save').onclick = () => {
-      const jp = v('#fJp'), ko = v('#fKo'), mean = v('#fMean');
-      if (!jp || !ko || !mean) return toast('일본어 · 한글 발음 · 뜻은 꼭 적어 주세요');
-      store.custom.push([jp, v('#fKana') || jp, ko, mean]); save(); toast('추가했어요'); renderAdd();
-    };
-    const $m = $view.querySelector('#mine');
-    store.custom.forEach((a, i) => {
-      const it = toItem(a, 'mine');
-      const d = document.createElement('div'); d.className = 'row';
-      d.innerHTML = `<div class="t"><div class="jp">${esc(it.jp)}</div><div class="ko-pron">${esc(it.ko)}</div><div class="mean">${esc(it.mean)}</div></div>
-        <button class="icon-btn" data-a="play">🔊</button><button class="icon-btn" data-a="del">🗑️</button>`;
-      d.onclick = e => {
-        const a2 = e.target.dataset.a;
-        if (a2 === 'play') speak(it.kana);
-        if (a2 === 'del' && confirm(`'${it.jp}'을(를) 삭제할까요?`)) { store.custom.splice(i, 1); save(); renderAdd(); }
-      };
-      $m.appendChild(d);
-    });
-  }
-
-  // ---------- 설정 ----------
-  function renderSettings() {
-    setHeader('설정', renderHome);
-    const s = store.settings;
-    const hasTTS = 'speechSynthesis' in window;
-    $view.innerHTML = `
-      <div class="panel">
-        <div class="field"><label>카드 학습 순서</label>
-          <select id="order">${Object.entries(ORDERS).map(([k, o]) => `<option value="${k}" ${s.order === k ? 'selected' : ''}>${o.label}</option>`).join('')}</select></div>
-        <div class="field"><label>말하기 속도: <span id="rv">${s.rate.toFixed(1)}</span>배</label>
-          <input type="range" id="rate" min="0.5" max="1.3" step="0.1" value="${s.rate}" style="padding:0"></div>
-        <label class="switch-row"><span>발음 자동 재생</span><input type="checkbox" id="auto" ${s.autoplay ? 'checked' : ''}></label>
-        <label class="switch-row"><span>카드 순서 섞기</span><input type="checkbox" id="shuf" ${s.shuffle ? 'checked' : ''}></label>
-      </div>
-      <div class="panel">
-        <div class="note">${hasTTS ? (jaVoice ? `🔊 일본어 음성: ${esc(jaVoice.name)}` : '⚠️ 일본어 음성이 아직 없어요. 휴대폰 설정 → 텍스트 음성 변환(TTS)에서 일본어 음성을 설치하면 더 자연스럽게 들려요.') : '⚠️ 이 브라우저는 음성 재생을 지원하지 않아요.'}</div>
-        <button class="btn ghost" style="width:100%;margin-top:12px" id="testv">음성 테스트: こんにちは</button>
-      </div>
-      <div class="panel">
-        <div class="note" style="margin-bottom:10px">한글 발음 표기: 장음은 “-” (아리가토-), っ는 받침으로 (잇테키마스)</div>
-        <button class="btn bad" style="width:100%" id="reset">학습 기록 초기화</button>
-      </div>`;
-    const q = id => $view.querySelector(id);
-    q('#order').onchange = e => { s.order = e.target.value; save(); };
-    q('#rate').oninput = e => { s.rate = +e.target.value; q('#rv').textContent = s.rate.toFixed(1); save(); };
-    q('#auto').onchange = e => { s.autoplay = e.target.checked; save(); };
-    q('#shuf').onchange = e => { s.shuffle = e.target.checked; save(); };
-    q('#testv').onclick = () => speak('こんにちは');
-    q('#reset').onclick = () => { if (confirm('외운 기록과 복습 목록을 모두 지울까요? (내 단어는 유지돼요)')) { store.progress = {}; save(); toast('초기화했어요'); } };
-  }
-
-  renderHome();
-
-  // 오프라인/홈 화면 설치 지원 (https 또는 localhost에서만 동작)
-  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
-})();
-</script>
+<script src="app.js"></script>
 </body>
 </html>
