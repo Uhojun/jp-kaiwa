@@ -45,6 +45,25 @@
   buildCats();
   const allItems = () => CATS.flatMap(c => c.list);
 
+  // 주제 묶음 (홈·설정 화면에서 그룹으로 표시)
+  const GROUPS = [
+    { name: '💬 친구·감정', ids: ['friend', 'emotion', 'react', 'react2', 'hangout', 'cheer', 'love', 'talk', 'talk2', 'person'] },
+    { name: '🧳 상황별 회화', ids: ['greet', 'basic', 'intro', 'ask', 'food', 'food2', 'shop', 'cloth', 'move', 'trans2', 'hotel', 'tour', 'clinic', 'work', 'school', 'contact', 'sns'] },
+    { name: '📚 기본 단어', ids: ['daily', 'verb', 'verb2', 'adj', 'adj2', 'adv', 'qword', 'people', 'job', 'eat', 'menu', 'place', 'home', 'thing', 'body', 'weather', 'nature', 'num', 'count', 'time', 'week', 'time2', 'color', 'animal', 'hobby', 'sport'] },
+  ];
+  function groupedCats() {
+    const used = new Set();
+    const out = GROUPS.map(g => {
+      const cats = g.ids.map(id => CATS.find(c => c.id === id)).filter(Boolean);
+      cats.forEach(c => used.add(c.id));
+      return { name: g.name, cats };
+    });
+    const rest = CATS.filter(c => !used.has(c.id) && c.id !== 'mine');
+    if (rest.length) out.push({ name: '📦 기타', cats: rest });
+    out.push({ name: '⭐ 내 단어', cats: CATS.filter(c => c.id === 'mine') });
+    return out.filter(g => g.cats.length);
+  }
+
   // =========================================================
   // 학습 상태 / 간격 반복
   // =========================================================
@@ -215,9 +234,11 @@
         <button data-q="star"><span>⭐</span><b>즐겨찾기</b><small>${stars}개</small></button>
       </div>
       <button class="setup-btn" id="setupBtn"><span>⚙️ 주제·범위·개수 직접 골라서 학습</span><span>›</span></button>
-      <div class="section-title">주제별</div>
-      <div class="grid">
-        ${CATS.map(c => {
+      ${groupedCats().map(g => {
+        const items = g.cats.flatMap(c => c.list);
+        return `<div class="section-title group-title"><span>${g.name}</span><span class="hint">${items.length}개 · 외움 ${pct(items)}%</span></div>
+        <div class="grid">
+        ${g.cats.map(c => {
           const d = c.list.filter(isDue).length;
           return `<button class="cat" data-id="${c.id}">
             <div class="emoji">${c.icon}</div><div class="name">${esc(c.name)}</div>
@@ -225,7 +246,8 @@
             <div class="bar"><i style="width:${pct(c.list)}%"></i></div>
           </button>`;
         }).join('')}
-      </div>`;
+        </div>`;
+      }).join('')}`;
     const base = { cats: [], kind: 'all', order: 'random' };
     $view.querySelector('#dueBtn').onclick = () => startSession({ ...base, scope: 'due', count: 0, mode: 'study' }, '오늘의 복습');
     const quick = {
@@ -290,7 +312,11 @@
       const n = buildDeck({ ...cfg, order: 'seq' }).length;
       $view.innerHTML = `
         <div class="section-title">주제 <span class="hint">${cfg.cats.length ? cfg.cats.length + '개 선택' : '선택 안 하면 전체'}</span></div>
-        <div class="chips wrap">${CATS.map(c => `<button class="chip ${cfg.cats.includes(c.id) ? 'on' : ''}" data-cat="${c.id}">${c.icon} ${esc(c.name)}</button>`).join('')}</div>
+        ${groupedCats().map((g, gi) => {
+          const allOn = g.cats.every(c => cfg.cats.includes(c.id));
+          return `<div class="group-head"><span>${g.name}</span><button data-grp="${gi}">${allOn ? '묶음 해제' : '묶음 전체 선택'}</button></div>
+          <div class="chips wrap">${g.cats.map(c => `<button class="chip ${cfg.cats.includes(c.id) ? 'on' : ''}" data-cat="${c.id}">${c.icon} ${esc(c.name)}</button>`).join('')}</div>`;
+        }).join('')}
         <div class="link-row"><button data-act="clear">선택 해제 (전체)</button><button data-act="rand">🎲 주제 3개 랜덤</button></div>
         <div class="section-title">범위</div>${seg('scope', SCOPES)}
         <div class="section-title">종류</div>${seg('kind', KINDS)}
@@ -305,6 +331,10 @@
       if (t.dataset.cat) {
         const id = t.dataset.cat;
         cfg.cats = cfg.cats.includes(id) ? cfg.cats.filter(x => x !== id) : [...cfg.cats, id];
+      } else if (t.dataset.grp !== undefined) {
+        const ids = groupedCats()[+t.dataset.grp].cats.map(c => c.id);
+        const allOn = ids.every(id => cfg.cats.includes(id));
+        cfg.cats = allOn ? cfg.cats.filter(id => !ids.includes(id)) : [...new Set([...cfg.cats, ...ids])];
       } else if (t.dataset.set) {
         cfg[t.dataset.set] = t.dataset.set === 'count' ? +t.dataset.v : t.dataset.v;
       } else if (t.dataset.act === 'clear') {

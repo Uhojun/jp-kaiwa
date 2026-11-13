@@ -1,6 +1,6 @@
 // 오프라인 캐시: 파일을 바꾸면 VERSION 숫자를 올려 주세요
-const VERSION = 'jp-kaiwa-v4';
-const FILES = ['./', './index.html', './data.js', './app.js', './manifest.webmanifest', './icon.svg'];
+const VERSION = 'jp-kaiwa-v5';
+const FILES = ['./', './index.html', './data.js', './data2.js', './app.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
